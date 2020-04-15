@@ -35,7 +35,8 @@ lib_deps =
 AudioSynthWaveformSine   sine1;          //xy=130,269
 AudioSynthWaveformPWM    pwm1;           //xy=226,367
 AudioInputUSB            usb1;           //xy=259,165
-AudioInputI2S            i2s2;           //xy=284,98
+AudioInputI2S            i2s2;           //xy=268,91
+AudioSynthNoiseWhite     noise1;         //xy=286,313
 AudioMixer4              mixer1;         //xy=525,127
 AudioMixer4              mixer4;         //xy=533,403
 AudioMixer4              mixer3;         //xy=534,328
@@ -57,14 +58,16 @@ AudioConnection          patchCord8(i2s2, 0, mixer1, 1);
 AudioConnection          patchCord9(i2s2, 0, mixer3, 1);
 AudioConnection          patchCord10(i2s2, 1, mixer2, 1);
 AudioConnection          patchCord11(i2s2, 1, mixer4, 1);
-AudioConnection          patchCord12(mixer1, 0, usb2, 0);
-AudioConnection          patchCord13(mixer4, 0, i2s1, 1);
-AudioConnection          patchCord14(mixer4, rms2);
-AudioConnection          patchCord15(mixer4, peak2);
-AudioConnection          patchCord16(mixer3, 0, i2s1, 0);
-AudioConnection          patchCord17(mixer3, peak1);
-AudioConnection          patchCord18(mixer3, rms1);
-AudioConnection          patchCord19(mixer2, 0, usb2, 1);
+AudioConnection          patchCord12(noise1, 0, mixer3, 2);
+AudioConnection          patchCord13(noise1, 0, mixer4, 2);
+AudioConnection          patchCord14(mixer1, 0, usb2, 0);
+AudioConnection          patchCord15(mixer4, 0, i2s1, 1);
+AudioConnection          patchCord16(mixer4, rms2);
+AudioConnection          patchCord17(mixer4, peak2);
+AudioConnection          patchCord18(mixer3, 0, i2s1, 0);
+AudioConnection          patchCord19(mixer3, peak1);
+AudioConnection          patchCord20(mixer3, rms1);
+AudioConnection          patchCord21(mixer2, 0, usb2, 1);
 // GUItool: end automatically generated code
 
 
