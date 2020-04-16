@@ -12,7 +12,7 @@ Tas5805m::Tas5805m()
 
 // Give me 7bit address e.g. 0x58>>1.
 // And the pin where /PDN is connected.
-bool Tas5805m::begin(byte adr, byte pinPDN)
+bool Tas5805m::begin(byte adr, byte pinPDN, bool start)
 {
     bool result = true;
     _adr = adr;
@@ -36,10 +36,6 @@ bool Tas5805m::begin(byte adr, byte pinPDN)
     write(DSP_MISC, 0x08); //decouple BQ coefs for LR
     delay(5);
     write(DEVICE_CTRL_2, 0x0B);  // Play + Mute
-    write(DEVICE_CTRL_2, 0x03);  // Play + UnMute
-
-    // write(SAP_CTRL3, 0x01); //mute left - tut nix
-    write(DIG_VOL_CTL, 0x30); //0x30 = 0db  adding 1 reduces gain by .5dB
 
     write(ADR_PIN_CTRL, 1); // enable output
     // ADR_PIN_CONFIG:
@@ -51,8 +47,14 @@ bool Tas5805m::begin(byte adr, byte pinPDN)
     // 01011: ADR as FAULTZ output
     write(ADR_PIN_CONFIG, 0b01011);
 
-
+    if(start)
+        ctlPlay();
     return result;
+}
+
+void Tas5805m::ctlPlay()
+{
+    write(DEVICE_CTRL_2, 0x03);  // Play + UnMute
 }
 
 // These bits indicate the currently detected audio sampling rate.

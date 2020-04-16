@@ -86,7 +86,6 @@ ClickEncoder _encoder1(pinROT1R, pinROT1L, pinROT1C, 4, LOW); // Bourns, STEC12E
 
 IntervalTimer encoderTimer;
 elapsedMillis timerLED;
-elapsedMillis timerDISP;
 elapsedMillis timerAMP;
 elapsedMillis timerInput;
 
@@ -95,6 +94,9 @@ Tas5805m _amp2;
 
 void setHighpass(Tas5805m &unit, uint32_t stage, float frequency, float q, Tas5805m::Channel ch);
 void setLowpass (Tas5805m &unit, uint32_t stage, float frequency, float q, Tas5805m::Channel ch);
+
+bool led = true;
+int16_t gain = -20; // initial volume starts low... move to EEPROM...
 
 void encoderServiceFunc()
 {
@@ -118,38 +120,34 @@ void setup()
 
     Serial.begin(115200);
     //Wait for console...
-    while (!Serial);
-    Serial.println("setup - start");
+    // while (!Serial);
+    // Serial.println("setup - start");
 
     Wire.begin();
-    // Wire.setClock(400000);
-
-    // _display.begin();
-    // _display.addPage(&_pageTest);
-
-    // mbStorage::the()->dump();
-    // mbStorage::the()->restore();
-
-    // _display.restore();
+    // Wire.setClock(400000); // mhm does not work properly
 
     float again = -15.0;
-    if(_amp0.begin((0x58+0)>>1, TasPDN))
+    if(_amp0.begin((0x58+0)>>1, TasPDN, LOW))
     {
         _amp0.setChannels(Tas5805m::LEFT, Tas5805m::BOTH);
         _amp0.setAnalogGain(again);
         setLowpass (_amp0, 0, 250, 0.7, Tas5805m::RIGHT);
         setHighpass(_amp0, 0, 250, 0.7, Tas5805m::LEFT);
+        _amp0.setDigitalVolume(gain);
+        _amp0.ctlPlay();
     }
     else
     {
         LOG.hex() <<"no TAS5805m found @0x" <<_amp0.getAdr();
     }
-    if(_amp2.begin((0x58+2)>>1, TasPDN))
+    if(_amp2.begin((0x58+2)>>1, TasPDN, LOW))
     {
         _amp2.setChannels(Tas5805m::RIGHT, Tas5805m::BOTH);
         _amp2.setAnalogGain(again);
         setLowpass (_amp2, 0, 250, 0.7, Tas5805m::RIGHT);
         setHighpass(_amp2, 0, 250, 0.7, Tas5805m::LEFT);
+        _amp2.setDigitalVolume(gain);
+        _amp2.ctlPlay();
     }
     else
     {
@@ -190,8 +188,6 @@ void setup()
     AudioInterrupts();
 }
 
-bool led = true;
-int16_t gain = 0;
 void loop()
 {
     // LOG <<"loop\n";
@@ -217,20 +213,11 @@ void loop()
         timerLED = 0;
     }
     
-    // if(timerDISP > 500)
-    // {
-    //     timerDISP = 0;
-
-    //     _pageTest.setLevels(rms1.read(), rms2.read(), peak1.read(), peak2.read());
-    //     _display.update();
-
-    //     // LOG << "bla\n";
-    // }
-
     if(timerAMP > 100)
     {
         timerAMP = 0;
-        LOG <<"--------- AMP 0 ---------\n";
+        LOG.dec(); // << "\033[22;34mHello, world!\033[0m";
+        LOG <<"--------- AMP 0 ----  " <<gain <<"\n";
         _amp0.loop();
         LOG <<"--------- AMP 2 ---------\n";
         _amp2.loop();

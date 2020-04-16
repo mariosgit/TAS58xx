@@ -33,7 +33,8 @@ public:
 
     Tas5805m();
     inline byte getAdr() {return _adr;};
-    bool begin(byte adr, byte pinPDN);
+    bool begin(byte adr, byte pinPDN, bool start = true);
+    void ctlPlay();
     void loop();
 
     void setAnalogGain(float gain); // -15.5..0
