@@ -35,7 +35,7 @@ public:
     inline byte getAdr() {return _adr;};
     bool begin(byte adr, byte pinPDN, bool start = true);
     void ctlPlay();
-    void loop();
+    bool loop();
 
     void setAnalogGain(float gain); // -15.5..0
     void setDigitalVolume(int gain); // -103.5(MUTE)..24 DIG_VOL_CTR
@@ -60,6 +60,8 @@ private:
 
     void logerror(const char*, byte code, byte adr);
     byte _adr;
+    byte _online;
+    byte _pinPDN;
 
     void setHighpass(uint32_t stage, float frequency, float q, Channel ch = BOTH);
     void setLowpass(uint32_t stage, float frequency, float q, Channel ch = BOTH);

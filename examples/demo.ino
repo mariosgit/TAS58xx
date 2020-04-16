@@ -88,6 +88,7 @@ IntervalTimer encoderTimer;
 elapsedMillis timerLED;
 elapsedMillis timerAMP;
 elapsedMillis timerInput;
+elapsedMillis timerRestart;
 
 Tas5805m _amp0;
 Tas5805m _amp2;
@@ -97,35 +98,15 @@ void setLowpass (Tas5805m &unit, uint32_t stage, float frequency, float q, Tas58
 
 bool led = true;
 int16_t gain = -20; // initial volume starts low... move to EEPROM...
+bool someOnline = true;
 
 void encoderServiceFunc()
 {
     _encoder1.service();
 }
 
-void setup()
+void startAmps()
 {
-    pinMode(pinROT1L, INPUT_PULLUP);
-    pinMode(pinROT1R, INPUT_PULLUP);
-    pinMode(pinROT1C, INPUT_PULLUP);
-    pinMode(pinSWRU,  INPUT_PULLUP);
-    pinMode(pinSWRD,  INPUT_PULLUP);
-    pinMode(pinLED, OUTPUT);
-    
-    // _encoder1.setDoubleClickTime(250); // long times delay the clicked detection !?
-    encoderTimer.begin(encoderServiceFunc, 1000);  // run every 1 miliseconds
-
-    // SPI.begin();
-    // SPI.setClockDivider(SPI_CLOCK_DIV2);
-
-    Serial.begin(115200);
-    //Wait for console...
-    // while (!Serial);
-    // Serial.println("setup - start");
-
-    Wire.begin();
-    // Wire.setClock(400000); // mhm does not work properly
-
     float again = -15.0;
     if(_amp0.begin((0x58+0)>>1, TasPDN, LOW))
     {
@@ -153,6 +134,32 @@ void setup()
     {
         LOG.hex() <<"no TAS5805m found @0x" <<_amp2.getAdr();
     }
+}
+
+void setup()
+{
+    pinMode(pinROT1L, INPUT_PULLUP);
+    pinMode(pinROT1R, INPUT_PULLUP);
+    pinMode(pinROT1C, INPUT_PULLUP);
+    pinMode(pinSWRU,  INPUT_PULLUP);
+    pinMode(pinSWRD,  INPUT_PULLUP);
+    pinMode(pinLED, OUTPUT);
+    
+    // _encoder1.setDoubleClickTime(250); // long times delay the clicked detection !?
+    encoderTimer.begin(encoderServiceFunc, 1000);  // run every 1 miliseconds
+
+    // SPI.begin();
+    // SPI.setClockDivider(SPI_CLOCK_DIV2);
+
+    Serial.begin(115200);
+    //Wait for console...
+    // while (!Serial);
+    // Serial.println("setup - start");
+
+    Wire.begin();
+    // Wire.setClock(400000); // mhm does not work properly
+
+    startAmps();
 
     AudioMemory(250); // with mbSynth
     AudioMemoryUsageMaxReset();
@@ -213,21 +220,28 @@ void loop()
         timerLED = 0;
     }
     
-    if(timerAMP > 100)
+    if(timerAMP > 100 && someOnline)
     {
         timerAMP = 0;
-        LOG.dec(); // << "\033[22;34mHello, world!\033[0m";
-        LOG <<"--------- AMP 0 ----  " <<gain <<"\n";
-        _amp0.loop();
-        LOG <<"--------- AMP 2 ---------\n";
-        _amp2.loop();
-        LOG <<"\n";
-
-        // http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0491i/CJAEEGCE.html
-        // uint32_t swap1 = 0x11223344;
-        // uint32_t swap2 = __REV(swap1);
-        // LOG.hex() <<"swap: " <<swap1 <<" -> " <<swap2 <<"\n";
+        if(someOnline)
+        {
+            someOnline = false;
+            LOG.dec(); // << "\033[22;34mHello, world!\033[0m";
+            LOG <<"--------- AMP 0 ----  " <<gain <<"\n";
+            someOnline |= _amp0.loop();
+            LOG <<"--------- AMP 2 ---------\n";
+            someOnline |= _amp2.loop();
+            LOG <<"\n";
+        }
     }
+    if(timerRestart > 3000 && !someOnline)
+    {
+        timerRestart = 0;
+        LOG <<"restarting amps !\n";
+        startAmps();
+        someOnline = true;
+    }
+
 }
 
 /* ADAU1704

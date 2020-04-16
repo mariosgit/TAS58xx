@@ -5,9 +5,11 @@
 
 bool Tas5805m::_isReset = false;
 
-Tas5805m::Tas5805m()
+Tas5805m::Tas5805m() :
+    _adr(0),
+    _online(false),
+    _pinPDN(0)
 {
-
 }
 
 // Give me 7bit address e.g. 0x58>>1.
@@ -49,6 +51,8 @@ bool Tas5805m::begin(byte adr, byte pinPDN, bool start)
 
     if(start)
         ctlPlay();
+
+    _online = result;
     return result;
 }
 
@@ -63,8 +67,7 @@ void Tas5805m::ctlPlay()
 // 0110: 32KHz 1000: Reserved
 // 1001: 48KHz 1011: 96KHz Others Reserved
 
-byte buf[256];
-void Tas5805m::loop()
+bool Tas5805m::loop()
 {
     readStatus();
 
@@ -76,6 +79,7 @@ void Tas5805m::loop()
     // write_9_23(0x18, 0.0);
 
     readLevels();
+    return _online;
 }
 
 void Tas5805m::setAnalogGain(float gain)
@@ -196,20 +200,22 @@ bool Tas5805m::setBookPage(byte book, byte page)
     Wire.write(0);
     Wire.write(0);
     retval = Wire.endTransmission();
-    result |= retval;
-    logerror("setBookPage1", retval, 0);
+    if(retval != 0)
+       result = false;
+    // logerror("setBookPage1", retval, 0);
     Wire.beginTransmission(_adr);
     Wire.write(0x7f);
     Wire.write(book);
     retval = Wire.endTransmission();
-    result |= retval;
-    logerror("setBookPage2", retval, 0x7f);
+    if(retval != 0)
+       result = false;
+    // logerror("setBookPage2", retval, 0x7f);
     Wire.beginTransmission(_adr);
     Wire.write(0);
     Wire.write(page);
     retval = Wire.endTransmission();
-    result |= retval;
-    logerror("setBookPage3", retval, 0);
+    logerror("setBookPage", retval, _adr);
+    _online &= result;
     return result;
 }
 
