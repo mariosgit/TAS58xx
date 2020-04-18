@@ -32,3 +32,9 @@ The demo starts with minimal gain and volume settings, see setAnalogGain() and s
 Audio input can be almost any I2S capable device which can run as a master. E.g Teensy3.2 and up, some PCM1808(needs clock), SPDIF/bluetooth/HDMI receiver boards from China, etc...
 
 I recommend laptop power bricks from the junkyard as power supply. No truly, these are often thrown away for no reason, please recycle !
+
+# Todo
+
+* Power Up Sequence fails sometimes !
+* Power down detect, could trigger a mute before caps run out.
+
