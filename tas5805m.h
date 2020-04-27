@@ -71,7 +71,7 @@ private:
     void setHighpass(uint32_t stage, float frequency, float q, Channel ch = BOTH);
     void setLowpass(uint32_t stage, float frequency, float q, Channel ch = BOTH);
 
-    void writeBQ(byte adr, const float *coef);
+    void writeBQ(byte page, byte adr, const float *coef);
     void readLevels(bool printLevels = false);
 
     float _levelLeft;

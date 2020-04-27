@@ -15,12 +15,14 @@ lib_deps =
 #include <ClickEncoder.h>  // it's on github
 #include <SPI.h>
 
+#define WITH_JSON
 #ifdef WITH_JSON   // ~4k flash
-// #include <ArduinoJson.h>
+#include <ArduinoJson.h>
 #endif
 
 #include <mbConfig.h>
-#define AUDIO_SAMPLE_RATE_EXACT 88200
+#define AUDIO_SAMPLE_RATE_EXACT 96000
+// #define AUDIO_SAMPLE_RATE_EXACT 88200
 #include <mbPageEQ.h>
 
 #include "tas5805m.h"
@@ -77,7 +79,7 @@ class PageCover : public PageType
 {
   public:
     PageCover() : PageType(),
-        _volume("vol", 0, 255),
+        _volume("vol", 0, 127),
         _func  ("vis", 0, 3),
         _horst ("pups", 0, 127)
     {
@@ -108,7 +110,32 @@ class PageCover : public PageType
     }
 
 private:
-    mbParameterRB<PAGES_POS_X2, PAGES_POS_Y0, PAGES_WIDTH_X1, PAGES_HEIGHT_X1> _volume;
+
+    class VolDispMapper
+    {
+    public:
+        int16_t operator()(uint8_t value)
+        {
+            // -103.5(MUTE)..24
+            int16_t val = -104;
+            return val+value;
+        }
+    };
+
+    class TriggerVol
+    {
+    public:
+        void operator()(uint8_t value)
+        {
+            int16_t val = -104;
+            val += value;
+            _amp0.setDigitalVolume(val);
+            _amp2.setDigitalVolume(val);
+
+        }
+    };
+
+    mbParameterRB<PAGES_POS_X2, PAGES_POS_Y0, PAGES_WIDTH_X1, PAGES_HEIGHT_X1, VolDispMapper, TriggerVol> _volume;
     mbParameterRB<PAGES_POS_X2, PAGES_POS_Y1, PAGES_WIDTH_X1, PAGES_HEIGHT_X1> _func;
     mbParameterRB<PAGES_POS_X2, PAGES_POS_Y2, PAGES_WIDTH_X1, PAGES_HEIGHT_X1> _horst;
 
@@ -116,8 +143,9 @@ private:
 
 void setCoefficientsCB(uint32_t stage, const float *coefficients)
 {
-    if(stage != 0)
+    if(stage < 0 || stage > 3)
         return;
+    
     LOG <<"setCoefficientsCB " <<stage;
     for(int i = 0; i < 5; i++)
         LOG <<" " <<coefficients[i];

@@ -196,17 +196,17 @@ void Tas5805m::setCoefficients(uint32_t stage, const float *coef, Channel ch)
     {
         setBookPage(0,0);
         write(BQ_WR_CTRL1,1); // Indicate the first coefficient of a BQ is starting to write.
-        setBookPage(0xaa, _bqBookL[stage]);
+        byte leftBQp =  _bqBookL[stage];
         byte leftBQ1 =  _bqAddrL[stage];
-        writeBQ(leftBQ1, coef);
+        writeBQ(leftBQp, leftBQ1, coef);
     }
     if(ch == BOTH || ch == RIGHT)
     {
         setBookPage(0,0);
         write(BQ_WR_CTRL1,1); // Indicate the first coefficient of a BQ is starting to write.
-        setBookPage(0xaa, _bqBookR[stage]);
+        byte rightBQp = _bqBookR[stage];
         byte rightBQ1 = _bqAddrR[stage];
-        writeBQ(rightBQ1, coef);
+        writeBQ(rightBQp, rightBQ1, coef);
     }
 
     // setBookPage(0x00, 0x00);
@@ -439,7 +439,7 @@ void Tas5805m::logerror(const char* text, byte code, byte adr)
     }
 }
 
-void Tas5805m::writeBQ(byte adr, const float *coef)
+void Tas5805m::writeBQ(byte page, byte adr, const float *coef)
 {
     byte result = 0;
     int32_t b0 = (int32_t)(coef[0]*0x8000000);
@@ -472,11 +472,28 @@ void Tas5805m::writeBQ(byte adr, const float *coef)
     // LOG.dec() <<"\n";
 
     // return;
+    setBookPage(0xaa, page);
+    if(adr != 0x7c)
+    {
+        Wire.beginTransmission(_adr);
+        Wire.write(adr);
+        Wire.write(buf,20);
+        result = Wire.endTransmission();
+    }
+    else // pffff... we must switch pages after first coeff
+    {
+        Wire.beginTransmission(_adr);
+        Wire.write(adr);
+        Wire.write(buf,4);
+        result = Wire.endTransmission();
 
-    Wire.beginTransmission(_adr);
-    Wire.write(adr);
-    Wire.write(buf,20);
-    result = Wire.endTransmission();
+        setBookPage(0xaa, page+1);
+        
+        Wire.beginTransmission(_adr);
+        Wire.write(0x18); // next allway at 0x18
+        Wire.write(buf+4,16);
+        result = Wire.endTransmission();
+    }
     logerror("writeBQ0:", result, adr);
 }
 
