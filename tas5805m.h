@@ -1,7 +1,9 @@
 #pragma once
 
 #include <Arduino.h>
-#include <Audio.h> // just for __REV()
+// #include <Audio.h> // just for __REV()
+#include <arm_math.h>
+#include <core_cmInstr.h>
 
 const byte RESET_CTRL = 0x01;
 const byte DEVICE_CTRL_1 = 0x02;
@@ -35,12 +37,15 @@ public:
     inline byte getAdr() {return _adr;};
     bool begin(byte adr, byte pinPDN, bool start = true);
     void ctlPlay();
-    bool loop();
+    bool loop(bool printLevels = false);
 
     void setAnalogGain(float gain); // -15.5..0
     void setDigitalVolume(int gain); // -103.5(MUTE)..24 DIG_VOL_CTR
     void setChannels(Channel chA, Channel chB);
-    void setCoefficients(uint32_t stage, float *coef, Channel ch);
+    void setCoefficients(uint32_t stage, const float *coef, Channel ch);
+
+    inline float getLevelDBLeft()   { return _dbLeft; }
+    inline float getLevelDBReight() { return _dbRight; }
 
 private:
     bool setBookPage(byte book, byte page);
@@ -66,8 +71,13 @@ private:
     void setHighpass(uint32_t stage, float frequency, float q, Channel ch = BOTH);
     void setLowpass(uint32_t stage, float frequency, float q, Channel ch = BOTH);
 
-    void writeBQ(byte adr, float *coef);
-    void readLevels();
+    void writeBQ(byte adr, const float *coef);
+    void readLevels(bool printLevels = false);
+
+    float _levelLeft;
+    float _levelReight;
+    float _dbLeft;
+    float _dbRight;
 
     static bool _isReset;
 };

@@ -19,9 +19,17 @@ lib_deps =
 // #include <ArduinoJson.h>
 #endif
 
+#include <mbConfig.h>
+#define AUDIO_SAMPLE_RATE_EXACT 88200
+#include <mbPageEQ.h>
+
 #include "tas5805m.h"
 
 #include <usb_names.h>
+
+// #include "./Fonts/Org_01.h"
+// #define FontType Org_01 // oh schick, leicht spaceisch //baseline +5
+
 
 // Encoders
 const byte pinROT1L = 3;
@@ -37,6 +45,8 @@ const byte TasPDN = 9;
 const byte midiChannel = 1;
 
 void setCoefficientsCB(uint32_t stage, const float *coefficients);
+DisplayType _display;
+mbPageEQ    _pageEQ(&setCoefficientsCB);
 
 ClickEncoder _encoder1(pinROT1R, pinROT1L, pinROT1C, 4, LOW); // Bourns, STEC12E08(Alps plastik)
 
@@ -57,6 +67,65 @@ bool led = true;
 float   again = -15.0;  //-15.5..0 dB determines max output, should fit the speaker
 int16_t gain = -20; // initial volume starts low... move to EEPROM...
 bool someOnline = true;
+
+#ifdef WITH_JSON
+DynamicJsonDocument docReceived(256);
+DynamicJsonDocument docToSend(1024);
+#endif
+
+class PageCover : public PageType
+{
+  public:
+    PageCover() : PageType(),
+        _volume("vol", 0, 255),
+        _func  ("vis", 0, 3),
+        _horst ("pups", 0, 127)
+    {
+        _params[_paramCount++] = &_volume;
+        _params[_paramCount++] = &_func;
+        _params[_paramCount++] = &_horst;
+    }
+
+    inline void redraw() override
+    {
+        display().clearDisplay();
+        // display().fillRect(5,5,20,20,1);
+    }
+
+    inline void setLevels( float l0, float r0, float l2, float r2 )
+    {
+        display().fillRect(0, 0, 48, 64, 0);
+        display().fillRect( 0, l0/-2, 8, 2, 1);
+        display().fillRect(12, r0/-2, 8, 2, 1);
+        display().fillRect(24, l2/-2, 8, 2, 1);
+        display().fillRect(36, r2/-2, 8, 2, 1);
+        // LOG <<"display: " <<l0 <<" " <<r0 <<"\n";
+    }
+
+    inline void update(bool force = false) override
+    {
+        return PageType::update(force);
+    }
+
+private:
+    mbParameterRB<PAGES_POS_X2, PAGES_POS_Y0, PAGES_WIDTH_X1, PAGES_HEIGHT_X1> _volume;
+    mbParameterRB<PAGES_POS_X2, PAGES_POS_Y1, PAGES_WIDTH_X1, PAGES_HEIGHT_X1> _func;
+    mbParameterRB<PAGES_POS_X2, PAGES_POS_Y2, PAGES_WIDTH_X1, PAGES_HEIGHT_X1> _horst;
+
+} _pageCover;
+
+void setCoefficientsCB(uint32_t stage, const float *coefficients)
+{
+    if(stage != 0)
+        return;
+    LOG <<"setCoefficientsCB " <<stage;
+    for(int i = 0; i < 5; i++)
+        LOG <<" " <<coefficients[i];
+    LOG <<"\n";
+
+    _amp0.setCoefficients(stage, coefficients, Tas5805m::BOTH);
+    _amp2.setCoefficients(stage, coefficients, Tas5805m::BOTH);
+}
 
 void encoderServiceFunc()
 {
@@ -115,7 +184,7 @@ void setup()
     // _encoder1.setDoubleClickTime(250); // long times delay the clicked detection !?
     encoderTimer.begin(encoderServiceFunc, 1000);  // run every 1 miliseconds
 
-    // SPI.begin();
+    SPI.begin();
     // SPI.setClockDivider(SPI_CLOCK_DIV2);
 
     Serial.begin(115200);
@@ -126,11 +195,19 @@ void setup()
     Wire.begin();
     // Wire.setClock(400000); // mhm does not work properly
 
+    // _display.get().setFont(&FontType);  // reduced 778byte oder so
+    _display.addPage(&_pageCover);
+    _display.addPage(&_pageEQ);
+    _display.begin();
+
     startAmps();
 
     usbMIDI.setHandleNoteOn(handleNoteOn);
     usbMIDI.setHandleNoteOff(handleNoteOff);
 
+    mbStorage::the()->dump();
+    // mbStorage::the()->restore();
+    // _display.restore();
 }
 
 void loop()
@@ -144,23 +221,87 @@ void loop()
         auto button = _encoder1.getButton();
         if(button == ClickEncoder::Clicked)
         {
+            _display.changeActiveParam(1);
         }
         else if(button == ClickEncoder::DoubleClicked)
         {
+            _display.changeCurrentPage(1);
         }
 
         int16_t val = _encoder1.getValue();
         if(val)
         {
+            _display.getPage().encoderValue(val);
 
-            gain += val;
-            // LOG.dec() <<"encoder:" <<val <<" gain:" <<gain <<"\n";
-            _amp0.setDigitalVolume(gain);
-            _amp2.setDigitalVolume(gain);
+            // gain += val;
+            // // LOG.dec() <<"encoder:" <<val <<" gain:" <<gain <<"\n";
+            // _amp0.setDigitalVolume(gain);
+            // _amp2.setDigitalVolume(gain);
         }
 
     }
 
+    if(timerUSBMidi > 20)
+    {
+        timerUSBMidi = 0;
+        if(usbMIDI.read(midiChannel))
+        {
+            if(usbMIDI.getType() == 0xF0)
+            {
+                int midiSysLength = usbMIDI.getSysExArrayLength();
+                if(midiSysLength > 3)
+                {
+                    // LOG <<LOG.dec <<"ohhh sysex !! len:" <<midiSysLength <<" type:" <<LOG.hex <<usbMIDI.getType() <<"\n";
+                    uint8_t *sysex = usbMIDI.getSysExArray();
+                    sysex[midiSysLength-1] = 0; // add a string end
+                    sysex++;
+
+                    LOG <<"sysex: \"" <<(char*)(sysex) <<"\" hex:";
+                    for(int i = 0; i < midiSysLength; i++)
+                        LOG <<LOG.hex <<" 0x" <<sysex[i];
+                    LOG <<"\n";
+
+#ifdef WITH_JSON
+
+                    // parse..
+                    deserializeJson(docReceived, sysex);
+                    const char* name = docReceived["name"];
+                    if(name)
+                    {
+                        LOG <<"deserialize:" <<name <<"\n";
+                    }
+                    else
+                    {
+                        LOG <<"deserialization... no name\n";
+                    }
+                    const char* cmd = docReceived["cmd"];
+                    if(cmd)
+                    {
+                        LOG <<"deser: got cmd " <<cmd <<"\n";
+                        if(strcmp(cmd, "disp") == 0)
+                        {
+                            docToSend.clear();
+                            docToSend["pages"] = 3;
+                        }
+                        else
+                        {
+                            // #define USB_MIDI_SYSEX_MAX 290 // steht in usb_midi.h
+                            docToSend["msg"] = "Hallo SysEx !!!";
+                            docToSend["time"]   = 1351824120;
+                            docToSend["data"][0] = 48.756080;
+                            docToSend["data"][1] = 2.302038;
+                        }
+                    }
+                    uint8_t data[256];
+                    size_t len = serializeJson(docToSend, data, 256);
+                    usbMIDI.sendSysEx(len, data);
+                    // This prints:
+                    // {"sensor":"gps","time":1351824120,"data":[48.756080,2.302038]}
+#endif
+                }
+            }
+        }
+    }
     // blink...
     if(timerLED > 50)
     {
@@ -168,6 +309,14 @@ void loop()
         digitalWrite(pinLED, led);
         // LOG <<"led an " <<led <<"\n";
         timerLED = 0;
+
+        _pageCover.setLevels(
+            _amp0.getLevelDBLeft(),
+            _amp0.getLevelDBReight(),
+            _amp2.getLevelDBLeft(),
+            _amp2.getLevelDBReight() );
+
+        _display.update();
     }
     
     if(timerAMP > 100 && someOnline)
