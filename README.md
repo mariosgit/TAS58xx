@@ -4,7 +4,7 @@ or similar devices ? A look at the datasheet and process flow document is strong
 
 A breakout board can be found in my mbAMP2 project or eventually one day on [Tindie](https://www.tindie.com/stores/majobecher/).
 
-# Achtung! Attention! Posor!
+# Attention! Achtung! Pozor! 留神！
 
 Do not use with your overexpensive audio equipment, this is DIY ! Aeehh I mean, you could **damage** drivers and ears while playing with this ! Also the AMP can handle quite some Amps, be aware of sparking shorts and magic smoke. You been warned.
 
