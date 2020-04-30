@@ -110,7 +110,7 @@ void Tas5805m::setDigitalVolume(int gain)
     {
         vol = 0x30 - 2*gain;
     }
-    LOG <<LOG.hex <<"setDigitalVolume: " <<gain <<" -> " <<vol <<"\n";
+    // LOG <<LOG.hex <<"setDigitalVolume: " <<gain <<" -> " <<vol <<"\n";
     setBookPage(0,0);
     write(DIG_VOL_CTL, vol); //0x30 = 0db  adding 1 reduces gain by .5dB
 }
@@ -129,8 +129,8 @@ void Tas5805m::setChannels(Channel chA, Channel chB)
             write_9_23(0x1c, 1.0); // right -> left
             break;
         case BOTH:
-            write_9_23(0x18, 1.0); // left -> left
-            write_9_23(0x1c, 1.0); // right -> left
+            write_9_23(0x18, 0.7); // left -> left
+            write_9_23(0x1c, 0.7); // right -> left
             break;
     }
     switch(chB)
@@ -144,12 +144,14 @@ void Tas5805m::setChannels(Channel chA, Channel chB)
             write_9_23(0x24, 1.0); // right -> right
             break;
         case BOTH:
-            write_9_23(0x20, 1.0); // left -> right
-            write_9_23(0x24, 1.0); // right -> right
+            write_9_23(0x20, 0.7); // left -> right
+            write_9_23(0x24, 0.7); // right -> right
             break;
     }
 }
 
+//adau hat 5.23 format, tas hat 5.27
+// a1 and a2 must be negated
 void Tas5805m::setCoefficients(uint32_t stage, const float *coef, Channel ch)
 {
     if(stage < 0 || stage > 14)
@@ -488,7 +490,7 @@ void Tas5805m::writeBQ(byte page, byte adr, const float *coef)
         result = Wire.endTransmission();
 
         setBookPage(0xaa, page+1);
-        
+
         Wire.beginTransmission(_adr);
         Wire.write(0x18); // next allway at 0x18
         Wire.write(buf+4,16);

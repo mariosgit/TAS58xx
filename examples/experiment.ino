@@ -131,7 +131,7 @@ private:
             val += value;
             _amp0.setDigitalVolume(val);
             _amp2.setDigitalVolume(val);
-
+            // LOG <<LOG.dec <<"TriggerVol:" <<value <<"\n";
         }
     };
 
@@ -143,10 +143,10 @@ private:
 
 void setCoefficientsCB(uint32_t stage, const float *coefficients)
 {
-    if(stage < 0 || stage > 3)
+    if(stage < 0 || stage > 7)
         return;
     
-    LOG <<"setCoefficientsCB " <<stage;
+    LOG <<"setCoefficientsCB " <<LOG.dec <<stage;
     for(int i = 0; i < 5; i++)
         LOG <<" " <<coefficients[i];
     LOG <<"\n";
@@ -166,8 +166,10 @@ void startAmps()
     {
         _amp0.setChannels(Tas5805m::LEFT, Tas5805m::BOTH);
         _amp0.setAnalogGain(again);
-        setLowpass (_amp0, 13, 250, 0.7, Tas5805m::RIGHT);
-        setHighpass(_amp0, 13, 250, 0.7, Tas5805m::LEFT);
+        // setLowpass (_amp0, 13, 80, 0.7, Tas5805m::RIGHT); //24db
+        // setHighpass(_amp0, 13, 80, 0.7, Tas5805m::LEFT);
+        setLowpass (_amp0, 14, 80, 0.7, Tas5805m::RIGHT);
+        setHighpass(_amp0, 14, 80, 0.7, Tas5805m::LEFT);
         _amp0.setDigitalVolume(gain);
         _amp0.ctlPlay();
     }
@@ -179,8 +181,10 @@ void startAmps()
     {
         _amp2.setChannels(Tas5805m::RIGHT, Tas5805m::BOTH);
         _amp2.setAnalogGain(again);
-        setLowpass (_amp2, 13, 250, 0.7, Tas5805m::RIGHT);
-        setHighpass(_amp2, 13, 250, 0.7, Tas5805m::LEFT);
+        // setLowpass (_amp2, 13, 80, 0.7, Tas5805m::RIGHT); // 24db
+        // setHighpass(_amp2, 13, 80, 0.7, Tas5805m::LEFT);
+        setLowpass (_amp2, 14, 80, 0.7, Tas5805m::RIGHT);
+        setHighpass(_amp2, 14, 80, 0.7, Tas5805m::LEFT);
         _amp2.setDigitalVolume(gain);
         _amp2.ctlPlay();
     }
@@ -234,8 +238,15 @@ void setup()
     usbMIDI.setHandleNoteOff(handleNoteOff);
 
     mbStorage::the()->dump();
-    // mbStorage::the()->restore();
-    // _display.restore();
+    LOG <<"---------------storage:restore ----------------\n";
+    mbStorage::the()->restore();
+    LOG <<"---------------restore:restore ----------------\n";
+    _display.restore();
+
+    // go to play mode after the EQs where restored
+    // _amp0.ctlPlay();
+    // _amp2.ctlPlay();
+
 }
 
 void loop()
@@ -259,7 +270,7 @@ void loop()
         int16_t val = _encoder1.getValue();
         if(val)
         {
-            _display.getPage().encoderValue(val);
+            _display.changeParamValue(val);
 
             // gain += val;
             // // LOG.dec() <<"encoder:" <<val <<" gain:" <<gain <<"\n";
@@ -367,36 +378,10 @@ void loop()
             someOnline = true;
         }
 
-        // mbStorage::the()->store();  // hängt sich auf !
+        mbStorage::the()->store();  // hängt sich auf !
     }
 
 }
-
-/* ADAU1704
-Numerical Format: 5.23
-Linear range: −16.0 to (+16.0 − 1 LSB)
-ADAU1701
-  with a range of 1.0 (minus 1 LSB) to −1.0.
- Figure 29 shows the maximum signal levels at each point in the data flow in both binary and decibel levels.
-4-BIT SIGN EXTENSION
- Examples: 
-  1000 0000   0000 0000 0000 0000 0000 = −16.0
-  1110 0000   0000 0000 0000 0000 0000 = −4.0
-  1111 1000   0000 0000 0000 0000 0000 = −1.0
-  1111 1110   0000 0000 0000 0000 0000 = −0.25
-  1111 1111   0011 0011 0011 0011 0011 = −0.1
-  1111 1111   1111 1111 1111 1111 1111 = (1 LSB below 0.0)
-  0000 0000   0000 0000 0000 0000 0000 = 0.0
-  0000 0000   1100 1100 1100 1100 1101 = 0.1
-  0000 0010   0000 0000 0000 0000 0000 = 0.25
-  0000 1000   0000 0000 0000 0000 0000 = 1.0
-  0010 0000   0000 0000 0000 0000 0000 = 4.0
-  0111 1111   1111 1111 1111 1111 1111 = (16.0 − 1 LSB).
-*/
-
-//adau hat 5.23 format, tas hat 5.27
-
-// a1 and a2 must be negated
 
 
 void setHighpass(Tas5805m &unit, uint32_t stage, float frequency, float q, Tas5805m::Channel ch) {

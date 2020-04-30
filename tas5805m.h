@@ -40,7 +40,7 @@ public:
     bool loop(bool printLevels = false);
 
     void setAnalogGain(float gain); // -15.5..0
-    void setDigitalVolume(int gain); // -103.5(MUTE)..24 DIG_VOL_CTR
+    void setDigitalVolume(int gain); // Allways both channels -103.5(MUTE)..24 DIG_VOL_CTR
     void setChannels(Channel chA, Channel chB);
     void setCoefficients(uint32_t stage, const float *coef, Channel ch);
 
