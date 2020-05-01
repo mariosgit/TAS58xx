@@ -37,4 +37,3 @@ I recommend laptop power bricks from the junkyard as power supply. No truly, the
 
 * Power Up Sequence fails sometimes !
 * Power down detect, could trigger a mute before caps run out.
-

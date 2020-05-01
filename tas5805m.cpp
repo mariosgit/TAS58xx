@@ -419,6 +419,7 @@ void Tas5805m::readStatus()
     }
     LOG <<"\n";
 }
+
 void Tas5805m::logerror(const char* text, byte code, byte adr)
 {
     switch(code)
@@ -506,7 +507,7 @@ void Tas5805m::readLevels(bool printLevels)
     _levelReight = read_1_31f(0x64);
     _dbLeft  = 20.0*log10f(_levelLeft);
     _dbRight = 20.0*log10f(_levelReight);
-    // LOG.dez(0) <<"level l:" <<dbLeft <<"db r:" <<dbRight <<"db\n";
+    // LOG.dez(0) <<"level l:" <<_dbLeft <<"db r:" <<_dbRight <<"db\n";
     int dbRestLeft  = 100+_dbLeft;
     int dbRestRight = 100+_dbRight;
     if(dbRestLeft < 0)
