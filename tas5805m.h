@@ -1,9 +1,11 @@
 #pragma once
 
 #include <Arduino.h>
-// #include <Audio.h> // just for __REV()
+
+#ifdef __arm__
 #include <arm_math.h>
 #include <core_cmInstr.h>
+#endif
 
 const byte RESET_CTRL = 0x01;
 const byte DEVICE_CTRL_1 = 0x02;
@@ -51,7 +53,13 @@ private:
     bool setBookPage(byte book, byte page);
 
     // inline uint32_t swap32(uint32_t val) { return (val&0xff000000)>>24 | (val&0x00ff0000)>>8 | (val&0x0000ff00)<<8 | (val&0x000000ff)<<24; }
-    inline uint32_t swap32(uint32_t val) { return __REV(val); }
+    inline uint32_t swap32(uint32_t val) {
+#ifdef __arm__ 
+        return __REV(val);
+#else
+        return val;
+#endif
+    }
 
     void write(byte reg, byte data);
     void write(byte reg, byte *buffer, uint8_t len);

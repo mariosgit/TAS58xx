@@ -22,7 +22,11 @@ bool Tas5805m::begin(byte adr, byte pinPDN, bool start)
     if(!_isReset)
     {
         // reset Tas5805m
+#ifdef ESP32
+        pinMode(pinPDN, OUTPUT);
+#else
         pinMode(pinPDN, OUTPUT_OPENDRAIN);
+#endif
         digitalWrite(pinPDN, LOW);
         delay(500);
         digitalWrite(pinPDN, HIGH);
@@ -30,7 +34,9 @@ bool Tas5805m::begin(byte adr, byte pinPDN, bool start)
         _isReset = true;
     }
 
-    result |= setBookPage(0,0);
+    result &= setBookPage(0,0);
+    if(!result)
+        return result;
     write(DEVICE_CTRL_2, 0x08);  // mute
     write(DEVICE_CTRL_2, 0x1A);  // DSPreset + HiZ + mute
     write(RESET_CTRL, 0x11); //reset DSP and CTL
