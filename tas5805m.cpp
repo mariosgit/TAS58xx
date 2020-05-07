@@ -8,7 +8,11 @@ bool Tas5805m::_isReset = false;
 Tas5805m::Tas5805m() :
     _adr(0),
     _online(false),
-    _pinPDN(0)
+    _pinPDN(0),
+    _levelLeft(0.0f),
+    _levelReight(0.0f),
+    _dbLeft(-80.0f),
+    _dbRight(-80.0f)
 {
 }
 
