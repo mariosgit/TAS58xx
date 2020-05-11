@@ -166,7 +166,7 @@ void Tas5805m::setCoefficients(uint32_t stage, const float *coef, Channel ch)
 {
     if(stage < 0 || stage > 14)
     {
-        LOG <<"Tas5805::setCoef.. stage out of range [0..14]" <<stage <<"\n";
+        // LOG <<"Tas5805::setCoef.. stage out of range [0..14]" <<stage <<"\n";
         return;
     }
     // LOG.dez(5);
@@ -206,7 +206,8 @@ void Tas5805m::setCoefficients(uint32_t stage, const float *coef, Channel ch)
 
     if(ch == BOTH || ch == LEFT)
     {
-        setBookPage(0,0);
+        if(!setBookPage(0,0))
+            return;
         write(BQ_WR_CTRL1,1); // Indicate the first coefficient of a BQ is starting to write.
         byte leftBQp =  _bqBookL[stage];
         byte leftBQ1 =  _bqAddrL[stage];
@@ -214,7 +215,8 @@ void Tas5805m::setCoefficients(uint32_t stage, const float *coef, Channel ch)
     }
     if(ch == BOTH || ch == RIGHT)
     {
-        setBookPage(0,0);
+        if(!setBookPage(0,0))
+            return;
         write(BQ_WR_CTRL1,1); // Indicate the first coefficient of a BQ is starting to write.
         byte rightBQp = _bqBookR[stage];
         byte rightBQ1 = _bqAddrR[stage];
@@ -240,6 +242,9 @@ bool Tas5805m::setBookPage(byte book, byte page)
     retval = Wire.endTransmission();
     if(retval != 0)
        result = false;
+    _online &= result;
+    if(!result)
+        return result;
     // logerror("setBookPage1", retval, 0);
     Wire.beginTransmission(_adr);
     Wire.write(0x7f);
@@ -247,6 +252,9 @@ bool Tas5805m::setBookPage(byte book, byte page)
     retval = Wire.endTransmission();
     if(retval != 0)
        result = false;
+    _online &= result;
+    if(!result)
+        return result;
     // logerror("setBookPage2", retval, 0x7f);
     Wire.beginTransmission(_adr);
     Wire.write(0);
