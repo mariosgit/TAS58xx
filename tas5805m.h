@@ -46,8 +46,8 @@ public:
     void setChannels(Channel chA, Channel chB);
     void setCoefficients(uint32_t stage, const float *coef, Channel ch);
 
-    inline float getLevelDBLeft()   { return _dbLeft; }
-    inline float getLevelDBReight() { return _dbRight; }
+    inline float getLevelDBLeft()  { return _dbLeft; }
+    inline float getLevelDBRight() { return _dbRight; }
 
 private:
     bool setBookPage(byte book, byte page);
