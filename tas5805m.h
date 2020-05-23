@@ -64,6 +64,8 @@ private:
     void write(byte reg, byte data);
     void write(byte reg, byte *buffer, uint8_t len);
     void write_9_23(byte reg, float val);
+    void write_1_31(byte reg, float val);
+    
     byte  read(byte reg);
     int   read(byte startreg, byte *buffer, uint8_t len);
     float read_1_31f(byte adr);

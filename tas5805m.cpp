@@ -38,6 +38,14 @@ bool Tas5805m::begin(byte adr, byte pinPDN, bool start)
         _isReset = true;
     }
 
+    // increase level meter time constant (default 10us)
+    result &= setBookPage(0x8c,0x2d);
+    float energyTimeConst = 0.02; // 20ms ?
+    write_1_31(0x1c, energyTimeConst);
+
+    if(!result)
+        return result;
+
     result &= setBookPage(0,0);
     if(!result)
         return result;
@@ -126,6 +134,7 @@ void Tas5805m::setDigitalVolume(int gain)
 }
 void Tas5805m::setChannels(Channel chA, Channel chB)
 {
+    float volBoth = 0.45;
     if(!setBookPage(0x8c,0x29))
         return;
     switch(chA)
@@ -139,8 +148,8 @@ void Tas5805m::setChannels(Channel chA, Channel chB)
             write_9_23(0x1c, 1.0); // right -> left
             break;
         case BOTH:
-            write_9_23(0x18, 0.7); // left -> left
-            write_9_23(0x1c, 0.7); // right -> left
+            write_9_23(0x18, volBoth); // left -> left
+            write_9_23(0x1c, volBoth); // right -> left
             break;
     }
     switch(chB)
@@ -154,8 +163,8 @@ void Tas5805m::setChannels(Channel chA, Channel chB)
             write_9_23(0x24, 1.0); // right -> right
             break;
         case BOTH:
-            write_9_23(0x20, 0.7); // left -> right
-            write_9_23(0x24, 0.7); // right -> right
+            write_9_23(0x20, volBoth); // left -> right
+            write_9_23(0x24, volBoth); // right -> right
             break;
     }
 }
@@ -290,6 +299,16 @@ void Tas5805m::write_9_23(byte reg, float val)
         uint8_t buf[4];
     } uval;
     uval.ival = swap32(val * (float)(8388608.0));  // only on ARM
+    write(reg, uval.buf, 4);
+}
+
+void Tas5805m::write_1_31(byte reg, float val)
+{
+    union AllVals {
+        int32_t ival;
+        uint8_t buf[4];
+    } uval;
+    uval.ival = swap32(val * (float)(2147483648.0));  // only on ARM
     write(reg, uval.buf, 4);
 }
 
