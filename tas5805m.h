@@ -10,6 +10,9 @@
 const byte RESET_CTRL = 0x01;
 const byte DEVICE_CTRL_1 = 0x02;
 const byte DEVICE_CTRL_2 = 0x03;
+const byte SIG_CH_CTRL = 0x28;
+const byte SAP_CTRL1 = 0x33;
+const byte SAP_CTRL2 = 0x34;
 const byte SAP_CTRL3 = 0x35;
 const byte FS_MON = 0x37;
 const byte DIG_VOL_CTL = 0x4c;
@@ -38,19 +41,21 @@ public:
     Tas5805m();
     inline byte getAdr() {return _adr;};
     bool begin(byte adr, byte pinPDN, bool start = true);
-    void ctlPlay();
+    void powerDown();   // mutes, powerDown
+    bool powerUp();  // powerUp
+    bool unMute();
     bool loop(bool printLevels = false);
 
-    void setAnalogGain(float gain); // -15.5..0
-    void setDigitalVolume(int gain); // Allways both channels -103.5(MUTE)..24 DIG_VOL_CTR
+    void setAnalogGain(float gain); //< -15.5..0
+    void setDigitalVolume(int gain); //< Allways both channels -103.5(MUTE)..24 DIG_VOL_CTR
     void setChannels(Channel chA, Channel chB);
     void setCoefficients(uint32_t stage, const float *coef, Channel ch);
 
     inline float getLevelDBLeft()  { return _dbLeft; }
     inline float getLevelDBRight() { return _dbRight; }
 
+
 private:
-    bool setBookPage(byte book, byte page);
 
     // inline uint32_t swap32(uint32_t val) { return (val&0xff000000)>>24 | (val&0x00ff0000)>>8 | (val&0x0000ff00)<<8 | (val&0x000000ff)<<24; }
     inline uint32_t swap32(uint32_t val) {
@@ -61,17 +66,17 @@ private:
 #endif
     }
 
-    void write(byte reg, byte data);
-    void write(byte reg, byte *buffer, uint8_t len);
-    void write_9_23(byte reg, float val);
-    void write_1_31(byte reg, float val);
-    
+    bool setBookPage(byte book, byte page);
+    bool write(byte reg, byte data);
+    bool write(byte reg, byte *buffer, uint8_t len);
+    bool write_9_23(byte reg, float val);
     byte  read(byte reg);
     int   read(byte startreg, byte *buffer, uint8_t len);
+    int32_t read_32i(byte adr);
     float read_1_31f(byte adr);
     float read_5_27f(byte adr);
     float read_9_23f(byte adr);
-    void  readStatus();
+    bool  readStatus();
 
     void logerror(const char*, byte code, byte adr);
     byte _adr;

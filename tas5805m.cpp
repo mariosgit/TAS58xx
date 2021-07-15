@@ -20,44 +20,71 @@ Tas5805m::Tas5805m() :
 // And the pin where /PDN is connected.
 bool Tas5805m::begin(byte adr, byte pinPDN, bool start)
 {
-    bool result = true;
     _adr = adr;
+    _pinPDN = pinPDN;
 
-    if(!_isReset)
-    {
-        // reset Tas5805m
 #ifdef ESP32
-        pinMode(pinPDN, OUTPUT);
+    pinMode(_pinPDN, OUTPUT);
 #else
-        pinMode(pinPDN, OUTPUT_OPENDRAIN);
+    pinMode(_pinPDN, OUTPUT_OPENDRAIN);
 #endif
-        digitalWrite(pinPDN, LOW);
+
+    powerDown();
+    if(start)
+    {
         delay(500);
-        digitalWrite(pinPDN, HIGH);
-        delay(500);
-        _isReset = true;
+        powerUp();
     }
 
-    // increase level meter time constant (default 10us)
-    result &= setBookPage(0x8c,0x2d);
-    float energyTimeConst = 0.02; // 20ms ?
-    write_1_31(0x1c, energyTimeConst);
+    return setBookPage(0,0);
+}
 
-    if(!result)
-        return result;
+void Tas5805m::powerDown()
+{
+    digitalWrite(_pinPDN, LOW);
+
+    LOG <<LOG.dec <<"Tas5805m::powerDown..." <<LOG.endl;
+}
+
+bool Tas5805m::powerUp()
+{
+    bool result = true;
+
+    LOG <<LOG.dec <<"Tas5805m::powerUp..." <<LOG.endl;
+
+    // Once power supplies are stable,bring up PDN to High and wait 5ms at least,then start SCLK,LRCLK.
+    digitalWrite(_pinPDN, HIGH);
+    delay(500);
+    _isReset = true;
 
     result &= setBookPage(0,0);
     if(!result)
         return result;
-    write(DEVICE_CTRL_2, 0x08);  // mute
-    write(DEVICE_CTRL_2, 0x1A);  // DSPreset + HiZ + mute
-    write(RESET_CTRL, 0x11); //reset DSP and CTL
-    // write(ANA_CTRL, 0x03); //175kHz Bandpass ??
-    write(DSP_MISC, 0x08); //decouple BQ coefs for LR
-    delay(5);
-    write(DEVICE_CTRL_2, 0x0B);  // Play + Mute
+    
+    LOG <<LOG.dec <<"Tas5805m::powerUp... init: " <<result <<LOG.endl;
 
-    write(ADR_PIN_CTRL, 1); // enable output
+    result &= write(DEVICE_CTRL_2, 0x08);  // mute
+    LOG <<LOG.dec <<"Tas5805m::powerUp... init 0: " <<result <<LOG.endl;
+
+    result &= write(DEVICE_CTRL_2, 0x1A);  // DSPreset + HiZ + mute
+    LOG <<LOG.dec <<"Tas5805m::powerUp... init 1: " <<result <<LOG.endl;
+
+    delay(5);
+    result &= write(RESET_CTRL, 0x11); //reset DSP and CTL
+    LOG <<LOG.dec <<"Tas5805m::powerUp... init 2: " <<result <<LOG.endl;
+
+    delay(5);
+    result &= write(SAP_CTRL1, 0x02); //0x02 = 24bit I2S, 0x00 = 16 bit i2s, eigentlich egal weil left aligned
+    
+    // write(ANA_CTRL, 0x03); //175kHz Bandpass ??
+    result &= write(DSP_MISC, 0x08); //decouple BQ coefs for LR
+    delay(5);
+    result &= write(DEVICE_CTRL_2, 0x0B);  // Play + Mute
+    LOG <<LOG.dec <<"Tas5805m::powerUp... init 3: " <<result <<LOG.endl;
+
+    delay(5);
+    result &= write(ADR_PIN_CTRL, 1); // enable output
+    LOG <<LOG.dec <<"Tas5805m::powerUp... init 4: " <<result <<LOG.endl;
     // ADR_PIN_CONFIG:
     // 00000: off (low)
     // 00011: Auto mute flag (asserted when both L and R channels are auto muted)
@@ -65,18 +92,23 @@ bool Tas5805m::begin(byte adr, byte pinPDN, bool start)
     // 00110: Clock invalid flag (clock error or clock missing) 00111: Reserved
     // 01001: Reserved
     // 01011: ADR as FAULTZ output
-    write(ADR_PIN_CONFIG, 0b01011);
+    delay(5);
+    result &= write(ADR_PIN_CONFIG, 0b01011);
 
-    if(start)
-        ctlPlay();
+    // set level meter inputs, default 0,0,1,1
+    // setBookPage(0x8c,0x2c);
+    // result &= write_9_23(0x0c, 1.0); //li
+    // result &= write_9_23(0x10, 0.0); //ri
+    // result &= write_9_23(0x14, 1.0); //lo
+    // result &= write_9_23(0x18, 0.0); //ro
 
-    _online = result;
     return result;
 }
 
-void Tas5805m::ctlPlay()
+bool Tas5805m::unMute()
 {
-    write(DEVICE_CTRL_2, 0x03);  // Play + UnMute
+    LOG <<LOG.dec <<"Tas5805m::unMute" <<LOG.endl;
+    return write(DEVICE_CTRL_2, 0x03);  // Play + UnMute
 }
 
 // These bits indicate the currently detected audio sampling rate.
@@ -87,16 +119,27 @@ void Tas5805m::ctlPlay()
 
 bool Tas5805m::loop(bool printLevels)
 {
-    readStatus();
+    bool result = readStatus();
 
-    //toggle LevelMeter to input
-    // setBookPage(0x8c, 0x2c);
-    // write_9_23(0x0c, 1.0);
-    // write_9_23(0x10, 1.0);
-    // write_9_23(0x14, 0.0);
-    // write_9_23(0x18, 0.0);
+    if(result)
+    {
+        if(printLevels)
+        {
+            //toggle LevelMeter to input
+            // setBookPage(0x8c, 0x2c);
+            // write_9_23(0x0c, 1.0);
+            // write_9_23(0x10, 1.0);
+            // write_9_23(0x14, 0.0);
+            // write_9_23(0x18, 0.0);
 
-    readLevels(printLevels);
+            readLevels(printLevels);
+        }
+    }
+    else
+    {
+        _online = false;
+        LOG <<LOG.hex <<"Tas5805m::loop OFFLINE adr:" <<_adr <<LOG.endl;
+    }
     return _online;
 }
 
@@ -112,7 +155,7 @@ void Tas5805m::setAnalogGain(float gain)
     // 00001: -0.5db
     // 11111: -15.5 dB
     uint8_t ugain = (uint8_t)gain;
-    LOG <<LOG.bin << "Tas5805m::setAGain" <<ugain <<"\n";
+    LOG <<LOG.bin << "Tas5805m::setAGain " <<ugain <<"\n";
     ugain = ugain & 0x1f;
     write(AGAIN, ugain);
 }
@@ -134,7 +177,7 @@ void Tas5805m::setDigitalVolume(int gain)
 }
 void Tas5805m::setChannels(Channel chA, Channel chB)
 {
-    float volBoth = 0.45;
+    // return;  /// hier is was faul !!! Wenn ich das mach wirds leise !!!
     if(!setBookPage(0x8c,0x29))
         return;
     switch(chA)
@@ -148,8 +191,8 @@ void Tas5805m::setChannels(Channel chA, Channel chB)
             write_9_23(0x1c, 1.0); // right -> left
             break;
         case BOTH:
-            write_9_23(0x18, volBoth); // left -> left
-            write_9_23(0x1c, volBoth); // right -> left
+            write_9_23(0x18, 0.7); // left -> left
+            write_9_23(0x1c, 0.7); // right -> left
             break;
     }
     switch(chB)
@@ -163,8 +206,8 @@ void Tas5805m::setChannels(Channel chA, Channel chB)
             write_9_23(0x24, 1.0); // right -> right
             break;
         case BOTH:
-            write_9_23(0x20, volBoth); // left -> right
-            write_9_23(0x24, volBoth); // right -> right
+            write_9_23(0x20, 0.7); // left -> right
+            write_9_23(0x24, 0.7); // right -> right
             break;
     }
 }
@@ -274,42 +317,44 @@ bool Tas5805m::setBookPage(byte book, byte page)
     return result;
 }
 
-void Tas5805m::write(byte reg, byte data)
+bool Tas5805m::write(byte reg, byte data)
 {
     Wire.beginTransmission(_adr);
     Wire.write(reg);
     Wire.write(data);
-    byte result = Wire.endTransmission();
-    logerror("write", result, reg);
+    byte retval = Wire.endTransmission();
+    if(retval != 0)
+       return false;
+    return true;
 }
 
-void Tas5805m::write(byte reg, byte *buffer, uint8_t len)
+bool Tas5805m::write(byte reg, byte *buffer, uint8_t len)
 {
     Wire.beginTransmission(_adr);
     Wire.write(reg);
     Wire.write(buffer, len);
-    byte result = Wire.endTransmission();
-    logerror("write", result, reg);
+    byte retval = Wire.endTransmission();
+    if(retval != 0)
+       return false;
+    return true;
 }
 
-void Tas5805m::write_9_23(byte reg, float val)
+bool Tas5805m::write_9_23(byte reg, float val)
 {
-    union AllVals {
-        int32_t ival;
-        uint8_t buf[4];
-    } uval;
-    uval.ival = swap32(val * (float)(8388608.0));  // only on ARM
-    write(reg, uval.buf, 4);
-}
+    int32_t ival;
+    uint8_t buf[4];
 
-void Tas5805m::write_1_31(byte reg, float val)
-{
-    union AllVals {
-        int32_t ival;
-        uint8_t buf[4];
-    } uval;
-    uval.ival = swap32(val * (float)(2147483648.0));  // only on ARM
-    write(reg, uval.buf, 4);
+    // beim read gehts ja...
+    // int32_t iVal  = buf[0]<<24 | buf[1]<<16 | buf[2]<<8 | buf[3];
+    ival = swap32(val * (float)(8388608.0));  // swap only on ARM !
+    // LOG << LOG.hex <<"write_9_23: " <<val <<" int:" <<ival <<LOG.endl;
+
+    buf[0] = (ival >> 24) & 0xff;
+    buf[1] = (ival >> 16) & 0xff;
+    buf[2] = (ival >>  8) & 0xff;
+    buf[3] = (ival      ) & 0xff;
+
+    return write(reg, buf, 4);
 }
 
 byte Tas5805m::read(byte reg)
@@ -341,6 +386,17 @@ int Tas5805m::read(byte startreg, byte *buffer, uint8_t len)
     return bytesread;
 }
 
+int32_t Tas5805m::read_32i(byte adr)
+{
+    byte buf[4];
+    int len = read(adr, buf, 4);
+    // LOG <<"levels: len:" <<len <<": ";
+    // for(int i = 0; i < 4; i++)
+    //     LOG.hex() <<buf[i] <<" ";
+    // LOG <<"\n";
+    int32_t iVal  = buf[0]<<24 | buf[1]<<16 | buf[2]<<8 | buf[3];
+    return iVal;
+}
 float Tas5805m::read_1_31f(byte adr)
 {
     byte buf[4];
@@ -378,8 +434,9 @@ float Tas5805m::read_9_23f(byte adr)
     return fVal;
 }
 
-void Tas5805m::readStatus()
+bool Tas5805m::readStatus()
 {
+    bool result = true;
     enum GC_BITS
     {
         CH1_DC_1 = 0x08,
@@ -394,7 +451,9 @@ void Tas5805m::readStatus()
         GC2_OTSD_I = 0x01
     };
 
-    setBookPage(0,0);
+    result &= setBookPage(0,0);
+    if(!result)
+        return result;
 
     byte chf = read(CHAN_FAULT);
     byte gf1 = read(GLOBAL_FAULT1);
@@ -420,41 +479,46 @@ void Tas5805m::readStatus()
         LOG <<"WARNING: " <<"Over temperature warning ,135C" <<"\n";
     }
 
-    return; //skip the details
+    // return; //skip the details
     byte dc1 = read(DEVICE_CTRL_1);
     byte dc2 = read(DEVICE_CTRL_2);
     LOG <<LOG.hex <<"device ctl 1:" <<dc1 <<" 2:" <<dc2 <<"\n";
 
     byte buf[6];
-    int result = read(FS_MON, buf, 2);
+    int resultFS = read(FS_MON, buf, 2);
     int bckRatio = ((buf[0] & 0x30) <<4) | buf[1];
-    result += read(CHAN_FAULT, buf+2, 4);
+    resultFS += read(CHAN_FAULT, buf+2, 4);
     byte ams = read(AUTOMUTE_STATE);
-    LOG <<LOG.hex <<"status:" <<result <<"bytes.. bckR:" <<LOG.dec <<bckRatio <<LOG.hex <<" ams:" <<(int(ams&0xfc))  <<" chf:"<<buf[2] <<" glf1:"<<buf[3] <<" glf2:"<<buf[4] <<" otw:"<<buf[5] ;
+    LOG <<LOG.hex <<"status:" <<resultFS <<"bytes.. bckR:" <<LOG.dec <<bckRatio <<LOG.hex <<" ams:" <<(int(ams&0xfc))  <<" chf:"<<buf[2] <<" glf1:"<<buf[3] <<" glf2:"<<buf[4] <<" otw:"<<buf[5] ;
     switch(buf[0])
     {
         case 0:
-            LOG <<" fs error\n";
+            LOG <<" fs error";
             break;
         case 0b0010:
-            LOG <<" fs 8kHz\n";
+            LOG <<" fs 8kHz";
             break;
         case 0b0100:
-            LOG <<" fs 16kHz\n";
+            LOG <<" fs 16kHz";
             break;
         case 0b0110:
-            LOG <<" fs 32kHz\n";
+            LOG <<" fs 32kHz";
             break;
         case 0b1001:
-            LOG <<" fs 48kHz\n";
+            LOG <<" fs 48kHz";
             break;
         case 0b1011:
-            LOG <<" fs 96kHz\n";
+            LOG <<" fs 96kHz";
             break;
         default:
             LOG <<" fs ???kHz" <<int(buf[0]) ;
     }
-    LOG <<"\n";
+    LOG <<LOG.endl;
+    // byte sap1 = read(SAP_CTRL1);
+    // byte sap2 = read(SAP_CTRL2);
+    // byte sap3 = read(SAP_CTRL3);
+    // LOG <<LOG.hex <<"   SAP_CTRL1:" <<sap1 <<"   SAP_CTRL2:"<<sap2 <<"   SAP_CTRL3:"<<sap3 <<LOG.endl;
+    return result;
 }
 
 void Tas5805m::logerror(const char* text, byte code, byte adr)
@@ -558,6 +622,9 @@ void Tas5805m::readLevels(bool printLevels)
     {
         LOG <<LOG.hex; // << "\033[22;34mHello, world!\033[0m";
         LOG <<"--------- AMP ----  0x" <<_adr <<LOG.dec <<" l:"<<_dbLeft <<" r:" <<_dbRight <<"\n";
+        for(int i = 0; i < 25; i++)
+            LOG <<".";
+        LOG <<"\n";
         for(int i = 0; i < dbRestLeft/4; i++)
             LOG <<"*";
         LOG <<"\n";
@@ -571,18 +638,31 @@ void Tas5805m::readLevels(bool printLevels)
     // float mixReightReight = read_9_23f(0x24);
     // LOG <<"mixll:" <<mixLeftLeft <<" mixrr:" <<mixReightReight <<"\n";
 
-#if 0
-    setBookPage(0x8c,0x2c);  // xbar
+    setBookPage(0x8c,0x29);
+    // int32_t xii1   = read_32i(0x18); // left -> left
+    // int32_t xii2   = read_32i(0x1c); // left -> right
+    // int32_t xii3   = read_32i(0x20); // right -> left
+    // int32_t xii4   = read_32i(0x24); // right -> right
+    // LOG <<LOG.hex <<"input xbar:\t\t" <<xii1 <<" " <<xii2 <<" " <<xii3 <<" " <<xii4 <<"\n";
+    float xi1     = read_9_23f(0x18); // left -> left
+    float xi2     = read_9_23f(0x1c); // left -> right
+    float xi3     = read_9_23f(0x20); // right -> left
+    float xi4     = read_9_23f(0x24); // right -> right
+    LOG <<LOG.dec <<"input xbar:\t\t" <<xi1 <<" " <<xi2 <<" " <<xi3 <<" " <<xi4 <<"\n";
+
+    setBookPage(0x8c,0x2c);  // output xbar
     float xb1     = read_9_23f(0x1c);
     float xb2     = read_9_23f(0x20);
     float xb3     = read_9_23f(0x28);
     float xb4     = read_9_23f(0x2c);
-    LOG <<"xbar:" <<xb1 <<" " <<xb2 <<" " <<xb3 <<" " <<xb4 <<"\n";
-    float ml1     = read_9_23f(0x0c);
-    float ml2     = read_9_23f(0x10);
-    float ml3     = read_9_23f(0x14);
-    float ml4     = read_9_23f(0x18);
-    LOG <<"mix level:" <<ml1 <<" " <<ml2 <<" " <<ml3 <<" " <<ml4 <<"\n";
+    LOG <<"output xbar:\t\t" <<xb1 <<" " <<xb2 <<" " <<xb3 <<" " <<xb4 <<"\n";
+
+    float ml1     = read_9_23f(0x0c);   // Level Meter Left gain from Left Input
+    float ml2     = read_9_23f(0x10);   // Level Meter Left gain from Right Input
+    float ml3     = read_9_23f(0x14);   // Level Meter Left gain from Left Output
+    float ml4     = read_9_23f(0x18);   // Level Meter Left gain from Right Output
+    LOG <<"meter mix level:\t" <<ml1 <<" " <<ml2 <<" " <<ml3 <<" " <<ml4 <<"\n";
+#if 0
     {
     setBookPage(0xaa, 0x24);
     float b0 = read_5_27f(0x18);
