@@ -95,12 +95,19 @@ bool Tas5805m::powerUp()
     delay(5);
     result &= write(ADR_PIN_CONFIG, 0b01011);
 
-    // set level meter inputs, default 0,0,1,1
+    // set level meter in/out-puts, default 0,0,1,1
     // setBookPage(0x8c,0x2c);
     // result &= write_9_23(0x0c, 1.0); //li
     // result &= write_9_23(0x10, 0.0); //ri
     // result &= write_9_23(0x14, 1.0); //lo
     // result &= write_9_23(0x18, 0.0); //ro
+
+    // toggle LevelMeter to input
+    // setBookPage(0x8c, 0x2c);
+    // write_9_23(0x0c, 1.0);
+    // write_9_23(0x10, 1.0);
+    // write_9_23(0x14, 0.0);
+    // write_9_23(0x18, 0.0);
 
     return result;
 }
@@ -123,17 +130,7 @@ bool Tas5805m::loop(bool printLevels)
 
     if(result)
     {
-        if(printLevels)
-        {
-            //toggle LevelMeter to input
-            // setBookPage(0x8c, 0x2c);
-            // write_9_23(0x0c, 1.0);
-            // write_9_23(0x10, 1.0);
-            // write_9_23(0x14, 0.0);
-            // write_9_23(0x18, 0.0);
-
-            readLevels(printLevels);
-        }
+        readLevels(printLevels);
     }
     else
     {
@@ -394,7 +391,7 @@ int32_t Tas5805m::read_32i(byte adr)
     // for(int i = 0; i < 4; i++)
     //     LOG.hex() <<buf[i] <<" ";
     // LOG <<"\n";
-    int32_t iVal  = buf[0]<<24 | buf[1]<<16 | buf[2]<<8 | buf[3];
+    int32_t iVal  = (buf[0]<<24 | buf[1]<<16 | buf[2]<<8 | buf[3]);
     return iVal;
 }
 float Tas5805m::read_1_31f(byte adr)
@@ -405,7 +402,7 @@ float Tas5805m::read_1_31f(byte adr)
     // for(int i = 0; i < 4; i++)
     //     LOG.hex() <<buf[i] <<" ";
     // LOG <<"\n";
-    int32_t iVal  = buf[0]<<24 | buf[1]<<16 | buf[2]<<8 | buf[3];
+    int32_t iVal  = (buf[0]<<24 | buf[1]<<16 | buf[2]<<8 | buf[3]);
     float fVal  = (float)iVal / (float)(2147483648.0);
     return fVal;
 }
@@ -417,7 +414,7 @@ float Tas5805m::read_5_27f(byte adr)
     // for(int i = 0; i < 4; i++)
     //     LOG.hex() <<buf[i] <<" ";
     // LOG <<"\n";
-    int32_t iVal = buf[0]<<24 | buf[1]<<16 | buf[2]<<8 | buf[3];
+    int32_t iVal = (buf[0]<<24 | buf[1]<<16 | buf[2]<<8 | buf[3]);
     float   fVal = (float)iVal / (float)(134217728.0);
     return fVal;
 }
@@ -429,7 +426,7 @@ float Tas5805m::read_9_23f(byte adr)
     // for(int i = 0; i < 4; i++)
     //     LOG.hex() <<buf[i] <<" ";
     // LOG <<"\n";
-    int32_t iVal = buf[0]<<24 | buf[1]<<16 | buf[2]<<8 | buf[3];
+    int32_t iVal = (buf[0]<<24 | buf[1]<<16 | buf[2]<<8 | buf[3]);
     float   fVal = (float)iVal / (float)(8388608.0);
     return fVal;
 }
@@ -453,14 +450,17 @@ bool Tas5805m::readStatus()
 
     result &= setBookPage(0,0);
     if(!result)
+    {
+        LOG <<"Tas5805m:readStatus:setBookPage FAIL" <<LOG.endl;
         return result;
+    }
 
     byte chf = read(CHAN_FAULT);
     byte gf1 = read(GLOBAL_FAULT1);
     byte gf2 = read(GLOBAL_FAULT2);
     if(chf&0xff || gf1&0xc7 || gf2&0x01)
     {
-        LOG <<"ERRORS: ";
+        LOG <<"Tas5805m:readStatus:ERRORS: ";
         if(chf & CH1_DC_1) { LOG <<"Left channel DC fault"; }
         if(chf & CH2_DC_1) { LOG <<"Right channel DC fault"; }
         if(chf & CH1_OC_I) { LOG <<"Left channel over current fault"; }
@@ -476,20 +476,22 @@ bool Tas5805m::readStatus()
     byte otw = read(OT_WARNING);
     if(otw&0x04)
     {
-        LOG <<"WARNING: " <<"Over temperature warning ,135C" <<"\n";
+        LOG <<"Tas5805m:readStatus:WARNING: " <<"Over temperature warning ,135C" <<"\n";
     }
 
-    // return; //skip the details
+    return result; //skip the details
+
+
     byte dc1 = read(DEVICE_CTRL_1);
     byte dc2 = read(DEVICE_CTRL_2);
-    LOG <<LOG.hex <<"device ctl 1:" <<dc1 <<" 2:" <<dc2 <<"\n";
+    LOG <<LOG.hex <<"Tas5805m:readStatus:device ctl 1:" <<dc1 <<" 2:" <<dc2 <<"\n";
 
     byte buf[6];
     int resultFS = read(FS_MON, buf, 2);
     int bckRatio = ((buf[0] & 0x30) <<4) | buf[1];
     resultFS += read(CHAN_FAULT, buf+2, 4);
     byte ams = read(AUTOMUTE_STATE);
-    LOG <<LOG.hex <<"status:" <<resultFS <<"bytes.. bckR:" <<LOG.dec <<bckRatio <<LOG.hex <<" ams:" <<(int(ams&0xfc))  <<" chf:"<<buf[2] <<" glf1:"<<buf[3] <<" glf2:"<<buf[4] <<" otw:"<<buf[5] ;
+    LOG <<LOG.hex <<"Tas5805m:readStatus:" <<resultFS <<"bytes.. bckR:" <<LOG.dec <<bckRatio <<LOG.hex <<" ams:" <<(int(ams&0xfc))  <<" chf:"<<buf[2] <<" glf1:"<<buf[3] <<" glf2:"<<buf[4] <<" otw:"<<buf[5] ;
     switch(buf[0])
     {
         case 0:
@@ -638,6 +640,8 @@ void Tas5805m::readLevels(bool printLevels)
     // float mixReightReight = read_9_23f(0x24);
     // LOG <<"mixll:" <<mixLeftLeft <<" mixrr:" <<mixReightReight <<"\n";
 
+    return;
+
     setBookPage(0x8c,0x29);
     // int32_t xii1   = read_32i(0x18); // left -> left
     // int32_t xii2   = read_32i(0x1c); // left -> right
@@ -645,8 +649,8 @@ void Tas5805m::readLevels(bool printLevels)
     // int32_t xii4   = read_32i(0x24); // right -> right
     // LOG <<LOG.hex <<"input xbar:\t\t" <<xii1 <<" " <<xii2 <<" " <<xii3 <<" " <<xii4 <<"\n";
     float xi1     = read_9_23f(0x18); // left -> left
-    float xi2     = read_9_23f(0x1c); // left -> right
-    float xi3     = read_9_23f(0x20); // right -> left
+    float xi2     = read_9_23f(0x1c); // right -> left
+    float xi3     = read_9_23f(0x20); // left -> right
     float xi4     = read_9_23f(0x24); // right -> right
     LOG <<LOG.dec <<"input xbar:\t\t" <<xi1 <<" " <<xi2 <<" " <<xi3 <<" " <<xi4 <<"\n";
 
