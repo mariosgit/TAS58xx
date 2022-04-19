@@ -57,6 +57,11 @@ bool Tas5805m::powerUp()
     delay(500);
     _isReset = true;
 
+    // soft reset !? when no PDN is connected
+    result &= write(DEVICE_CTRL_2, 0x1A);  // DSP reset + HiZ + Mute
+    delay(100);
+    result &= write(DEVICE_CTRL_2, 0x0A);  // DSP run + HiZ + Mute
+
     result &= setBookPage(0,0);
     if(!result)
         return result;
